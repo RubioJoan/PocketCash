@@ -16,6 +16,7 @@ public class ClientDashboard extends JFrame {
     private DefaultTableModel transactionsModel;
     private JTable transactionsTable;
     private JLabel notificationDot;
+    private JLabel notificationBadge;
 
     private static final Color APP_BG = new Color(58, 213, 159);
 
@@ -165,13 +166,28 @@ public class ClientDashboard extends JFrame {
         panel.add(iconWithText("transactions.png", "Transactions", e -> new TransactionsWindow(user)));
 
         // noti
-        JPanel notifPanel = iconWithText("notification.png", "Notifications", e -> new NotificationsWindow(user));
+        JPanel notifPanel = iconWithText("notification.png", "Notifications", e -> {
+            new NotificationsWindow(user);
+            updateNotificationBadge(); // auto hide when opened
+        });
+
 
         JLayeredPane layered = new JLayeredPane();
         layered.setPreferredSize(notifPanel.getPreferredSize());
 
         notifPanel.setBounds(0, 0, notifPanel.getPreferredSize().width, notifPanel.getPreferredSize().height);
         layered.add(notifPanel, Integer.valueOf(0));
+
+        notificationBadge = new JLabel();
+        notificationBadge.setOpaque(true);
+        notificationBadge.setBackground(Color.RED);
+        notificationBadge.setForeground(Color.WHITE);
+        notificationBadge.setFont(new Font("Arial", Font.BOLD, 10));
+        notificationBadge.setHorizontalAlignment(SwingConstants.CENTER);
+        notificationBadge.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
+        notificationBadge.setBounds(notifPanel.getWidth() - 18, 0, 18, 18);
+        layered.add(notificationBadge, Integer.valueOf(2));
+
 
         notificationDot = new JLabel("\u2B24"); // small circle ●
         notificationDot.setForeground(Color.RED);
@@ -182,6 +198,7 @@ public class ClientDashboard extends JFrame {
 
         panel.add(layered);
 
+        updateNotificationBadge();
 
         return panel;
     }
@@ -218,6 +235,32 @@ public class ClientDashboard extends JFrame {
             e.printStackTrace();
         }
         return false;
+    }
+
+    private int getUnreadNotificationCount() {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM notifications WHERE mobileNumber=? AND isRead=0");
+            stmt.setString(1, user.getMobileNumber());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getInt(1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    private void updateNotificationBadge() {
+        int unread = getUnreadNotificationCount();
+
+        if (notificationBadge != null) {
+            notificationBadge.setText(String.valueOf(unread));
+            notificationBadge.setVisible(unread > 0);
+        }
+
+        if (notificationDot != null) {
+            notificationDot.setVisible(unread > 0);
+        }
     }
 
     private JComponent dividerLine() {
@@ -270,7 +313,8 @@ public class ClientDashboard extends JFrame {
         balanceLabel.setText(nf.format(user.getBalance()));
 
         loadTransactions();
-        if (notificationDot != null) notificationDot.setVisible(hasUnreadNotifications());
+        updateNotificationBadge();
+
     }
 
     private void loadTransactions() {
@@ -299,18 +343,57 @@ public class ClientDashboard extends JFrame {
 
     // send money
     private void sendMoney(ActionEvent e) {
-        String recipientInput = JOptionPane.showInputDialog(this,
-                "Enter recipient mobile number (e.g., 912345678):");
-        if (recipientInput == null || recipientInput.isEmpty()) return;
 
-        recipientInput = recipientInput.trim();
+        // panel form
+        JPanel form = new JPanel();
+        form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
+        form.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        JTextField mobileField = new JTextField();
+        JTextField amountField = new JTextField();
+
+        mobileField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+        amountField.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+
+        form.add(new JLabel("Recipient Mobile Number(9 digits only)"));
+        form.add(mobileField);
+        mobileField.setToolTipText("Enter last 9 digits only (e.g. 912345678)");
+        form.add(Box.createVerticalStrut(10));
+
+        form.add(new JLabel("Amount"));
+        form.add(amountField);
+
+        // custom icon
+        ImageIcon icon = loadIcon("send.png", 48);
+
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                form,
+                "PocketCash - Send Money",
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE,
+                icon
+        );
+
+        if (result != JOptionPane.OK_OPTION) return;
+
+        String recipientInput = mobileField.getText().trim();
+        String amtStr = amountField.getText().trim();
+
+        if (recipientInput.isEmpty() || amtStr.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "All fields are required!");
+            return;
+        }
+
         String recipientMobile = "+639-" + recipientInput;
-
-        String amtStr = JOptionPane.showInputDialog(this, "Enter amount to send:");
-        if (amtStr == null || amtStr.isEmpty()) return;
 
         try {
             double amount = Double.parseDouble(amtStr);
+
+            if (amount <= 0) {
+                JOptionPane.showMessageDialog(this, "Invalid amount!");
+                return;
+            }
 
             if (amount > user.getBalance()) {
                 JOptionPane.showMessageDialog(this, "Insufficient balance!");
@@ -319,72 +402,81 @@ public class ClientDashboard extends JFrame {
 
             try (Connection conn = DatabaseConnection.getConnection()) {
 
+                // check recipient
                 PreparedStatement check = conn.prepareStatement(
                         "SELECT COUNT(*) FROM users WHERE mobileNumber=?");
                 check.setString(1, recipientMobile);
                 ResultSet rs = check.executeQuery();
                 rs.next();
+
                 if (rs.getInt(1) == 0) {
                     JOptionPane.showMessageDialog(this, "Recipient does not exist!");
                     return;
                 }
 
-                // Deduct from sender
+                // deduct sender
                 PreparedStatement ps1 = conn.prepareStatement(
                         "UPDATE users SET balance = balance - ? WHERE mobileNumber=?");
                 ps1.setDouble(1, amount);
                 ps1.setString(2, user.getMobileNumber());
                 ps1.executeUpdate();
 
-                // Log sender transaction
+                // sender transaction
                 PreparedStatement ps2 = conn.prepareStatement(
                         "INSERT INTO transactions(mobileNumber, type, amount, date) VALUES (?, ?, ?, NOW())");
                 ps2.setString(1, user.getMobileNumber());
-                ps2.setString(2, "Send Money to: " + recipientMobile);
+                ps2.setString(2, "Sent to " + recipientMobile);
                 ps2.setDouble(3, amount);
                 ps2.executeUpdate();
 
-                // Add to recipient
+                // add to recipient
                 PreparedStatement ps3 = conn.prepareStatement(
                         "UPDATE users SET balance = balance + ? WHERE mobileNumber=?");
                 ps3.setDouble(1, amount);
                 ps3.setString(2, recipientMobile);
                 ps3.executeUpdate();
 
-                // Log recipient transaction
+                // recipient transaction
                 PreparedStatement ps4 = conn.prepareStatement(
                         "INSERT INTO transactions(mobileNumber, type, amount, date) VALUES (?, ?, ?, NOW())");
                 ps4.setString(1, recipientMobile);
-                ps4.setString(2, "Receive Money from: " + user.getMobileNumber());
+                ps4.setString(2, "Received from " + user.getMobileNumber());
                 ps4.setDouble(3, amount);
                 ps4.executeUpdate();
 
-                // Add notification
+                // notification
                 PreparedStatement psNotify = conn.prepareStatement(
-                        "INSERT INTO notifications(mobileNumber, message, isRead) VALUES (?, ?, 0)");
+                        "INSERT INTO notifications(mobileNumber, senderName, message, isRead) VALUES (?, ?, ?, 0)");
                 psNotify.setString(1, recipientMobile);
-                psNotify.setString(2, "You received ₱" + amount + " from " + user.getMobileNumber());
+                psNotify.setString(2, user.getName());
+                psNotify.setString(3,
+                        "You received ₱" + amount + " from " + user.getMobileNumber());
                 psNotify.executeUpdate();
             }
 
             user.setBalance(user.getBalance() - amount);
             refreshBalanceAndTransactions();
+
             JOptionPane.showMessageDialog(this, "Money sent successfully!");
 
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Invalid input!");
+            JOptionPane.showMessageDialog(this, "Invalid amount!");
         } catch (Exception ex) {
             ex.printStackTrace();
             JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
         }
     }
 
+
     // bot nav
     private JPanel bottomNav() {
         JPanel panel = new JPanel(new GridLayout(1, 4));
         panel.setBackground(APP_BG);
 
-        panel.add(navIcon("settings.png"));
+        JButton settingsBtn = navIcon("settings.png");
+        settingsBtn.addActionListener(e -> new SettingsWindow(user));
+        panel.add(settingsBtn);
+
         panel.add(navIcon("home.png"));
         panel.add(navIcon("profile.png"));
 
@@ -393,8 +485,8 @@ public class ClientDashboard extends JFrame {
             dispose();
             new MainDashboard();
         });
-
         panel.add(logout);
+
         return panel;
     }
 
@@ -442,4 +534,5 @@ public class ClientDashboard extends JFrame {
                     radius, radius);
         }
     }
+
 }
