@@ -43,4 +43,9 @@ public class User {
     public void setBalance(double balance) {
         this.balance = balance;
     }
+
+    public void setPinCode(String pinCode) {
+        this.pinCode = pinCode;
+    }
+
 }
