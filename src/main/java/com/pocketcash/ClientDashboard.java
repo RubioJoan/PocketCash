@@ -477,8 +477,17 @@ public class ClientDashboard extends JFrame {
         settingsBtn.addActionListener(e -> new SettingsWindow(user));
         panel.add(settingsBtn);
 
+        JButton homeBtn = navIcon("home.png");
+        settingsBtn.addActionListener(e -> new ClientDashboard(user));
         panel.add(navIcon("home.png"));
-        panel.add(navIcon("profile.png"));
+
+        JButton profileBtn = navIcon("profile.png");
+        profileBtn.addActionListener(e -> {
+            new ProfileWindow(user);
+        });
+        panel.add(profileBtn);
+
+
 
         JButton logout = navIcon("logout.png");
         logout.addActionListener(e -> {
