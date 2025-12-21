@@ -6,10 +6,10 @@ public class User {
     private String mobileNumber;
     private String email;
     private String pinCode;
-    private double balance; // or double balance
+    private double balance; 
     private String role;
 
-    private String status; // "NOT_REGISTERED", "WRONG_PIN", null = success
+    private String status; 
 
     // Constructor for DB users
     public User(int id, String name, String mobileNumber,
