@@ -5,17 +5,17 @@ import java.sql.DriverManager;
 
 public class DatabaseConnection {
 
-    private static final String URL = "jdbc:mysql://localhost:3306/pocketcash"; // your DB name
-    private static final String USER = "root";  // default XAMPP user
-    private static final String PASS = "";      // default XAMPP password is empty
+    private static final String URL = "jdbc:mysql://localhost:3306/pocketcash"; 
+    private static final String USER = "root"; 
+    private static final String PASS = "";      
 
     public static Connection getConnection() {
         try {
-            Class.forName("com.mysql.cj.jdbc.Driver"); // load driver
+            Class.forName("com.mysql.cj.jdbc.Driver"); 
             return DriverManager.getConnection(URL, USER, PASS);
         } catch (Exception e) {
             e.printStackTrace();
-            return null; // returns null if connection fails
+            return null;
         }
     }
 }
