@@ -29,7 +29,7 @@ public class TransactionsWindow extends JFrame {
         panel.setBackground(new Color(58, 213, 159));
         panel.setBorder(BorderFactory.createEmptyBorder(20, 15, 15, 15));
 
-        // top bar (back + title)
+        // top bar
         JPanel topBar = new JPanel(new BorderLayout());
         topBar.setOpaque(false);
 
@@ -50,14 +50,12 @@ public class TransactionsWindow extends JFrame {
 
         panel.add(topBar, BorderLayout.NORTH);
 
-
-
         // Table setup
         String[] cols = {"Date", "Type", "Amount"};
         transactionsModel = new DefaultTableModel(cols, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return false; // prevent editing
+                return false;
             }
         };
         transactionsTable = new JTable(transactionsModel);
@@ -68,7 +66,7 @@ public class TransactionsWindow extends JFrame {
         transactionsTable.setShowGrid(true);
         transactionsTable.setGridColor(Color.LIGHT_GRAY);
 
-        // Center all columns
+        // columns
         DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
         centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
         for (int i = 0; i < transactionsTable.getColumnCount(); i++) {
@@ -99,7 +97,6 @@ public class TransactionsWindow extends JFrame {
             }
         });
 
-
         // Scrollable table
         JScrollPane scrollPane = new JScrollPane(transactionsTable);
         scrollPane.setBorder(BorderFactory.createLineBorder(Color.BLACK));
@@ -120,7 +117,7 @@ public class TransactionsWindow extends JFrame {
     }
 
     private void loadAllTransactions() {
-        transactionsModel.setRowCount(0); // clear table
+        transactionsModel.setRowCount(0); 
 
         try (Connection conn = DatabaseConnection.getConnection()) {
             PreparedStatement stmt = conn.prepareStatement(
