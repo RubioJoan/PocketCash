@@ -8,7 +8,7 @@ import java.sql.PreparedStatement;
 public class TransactionForm extends JFrame {
 
     private User user;
-    private ClientDashboard dashboard; // reference to refresh dashboard
+    private ClientDashboard dashboard;
     private String type;
 
     public TransactionForm(User user, String type, ClientDashboard dashboard) {
@@ -54,14 +54,14 @@ public class TransactionForm extends JFrame {
 
             Connection conn = DatabaseConnection.getConnection();
 
-            // ================= UPDATE USER BALANCE =================
+            //user balance
             String sql = "UPDATE users SET balance=? WHERE mobileNumber=?";
             PreparedStatement stmt = conn.prepareStatement(sql);
             stmt.setDouble(1, newBalance);
             stmt.setString(2, user.getMobileNumber());
             stmt.executeUpdate();
 
-            // ================= LOG TRANSACTION =================
+            //log trans
             String transactionSQL = "INSERT INTO transactions(mobileNumber, type, amount, date) VALUES (?, ?, ?, NOW())";
             PreparedStatement tsmt = conn.prepareStatement(transactionSQL);
             tsmt.setString(1, user.getMobileNumber());
@@ -69,7 +69,7 @@ public class TransactionForm extends JFrame {
             tsmt.setDouble(3, amount);
             tsmt.executeUpdate();
 
-            // ================= UPDATE LOCAL USER & DASHBOARD =================
+            // user and dashboard
             user.setBalance(newBalance);
             if (dashboard != null) {
                 dashboard.refreshBalanceAndTransactions();
